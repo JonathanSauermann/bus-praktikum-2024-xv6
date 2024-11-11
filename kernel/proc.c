@@ -12,6 +12,8 @@ struct proc proc[NPROC];
 
 struct proc *initproc;
 
+int en_strace = 0;
+
 int nextpid = 1;
 struct spinlock pid_lock;
 
@@ -124,6 +126,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->strace = en_strace;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -691,5 +694,22 @@ procdump(void)
       state = "???";
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
+  }
+}
+
+void
+set_enable_tracing(int en)
+{
+  if (en_strace == en) {
+    return;
+  } else {
+    en_strace = en;
+
+    struct proc* p;
+    for (p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      p->strace = en;
+      release(&p->lock);
+    }
   }
 }

@@ -91,3 +91,28 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+#define MAXSTRING 8
+
+uint64
+sys_strace(void)
+{
+  struct proc* p = myproc();
+  char cmd[8];
+
+  int f = argstr(0, cmd, MAXSTRING);
+  if (f == -1)
+    return -1;
+
+  if (strncmp(cmd, "enable", MAXSTRING) == 0) {
+    set_enable_tracing(1);
+  } else  if (strncmp(cmd, "disable", MAXSTRING) == 0) {
+    set_enable_tracing(0);
+  } else {
+    set_enable_tracing(0);
+    acquire(&p->lock);
+    p->strace = 1;
+    release(&p->lock);
+  }
+  return 0;
+}
