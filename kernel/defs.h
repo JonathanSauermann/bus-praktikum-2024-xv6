@@ -106,6 +106,7 @@ void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
+void            set_enable_tracing(int en);
 
 // swtch.S
 void            swtch(struct context*, struct context*);
@@ -187,3 +188,15 @@ void            virtio_disk_intr(void);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
+
+
+struct proc_info {
+    char name[16];
+    int pid;
+    char state[10];
+    int open_files;
+    int memory;
+};
+int count_open_files(struct proc*);
+
+int psinfo(struct proc_info*);

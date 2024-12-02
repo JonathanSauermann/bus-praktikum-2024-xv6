@@ -91,3 +91,39 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+#define MAXSTRING 8
+
+uint64
+sys_strace(void)
+{
+  struct proc* p = myproc();
+  char cmd[8];
+
+  int f = argstr(0, cmd, MAXSTRING);
+  if (f == -1)
+    return -1;
+
+  if (strncmp(cmd, "enable", MAXSTRING) == 0) {
+    set_enable_tracing(1);
+  } else  if (strncmp(cmd, "disable", MAXSTRING) == 0) {
+    set_enable_tracing(0);
+  } else {
+    set_enable_tracing(0);
+    acquire(&p->lock);
+    p->strace = 1;
+    release(&p->lock);
+  }
+  return 0;
+}
+
+uint64 sys_psinfo(void) {
+    uint64 addr;
+    struct proc_info info[NPROC];
+
+    if (fetchaddr(0, &addr) < 0) return -1;
+    int count = psinfo(info);
+    if (copyout(myproc()->pagetable, addr, (char*)info, count * sizeof(struct proc_info)) < 0)
+        return -1;
+    return count;
+}

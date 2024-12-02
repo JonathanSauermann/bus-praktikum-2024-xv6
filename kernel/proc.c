@@ -12,6 +12,8 @@ struct proc proc[NPROC];
 
 struct proc *initproc;
 
+int en_strace = 0;
+
 int nextpid = 1;
 struct spinlock pid_lock;
 
@@ -124,6 +126,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->strace = en_strace;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -322,6 +325,8 @@ fork(void)
   np->state = RUNNABLE;
   release(&np->lock);
 
+  printf("%d fork(): process PID %d (parent) called fork(). xv6 created a new child process %d\n", ticks, np->parent->pid, np->pid);
+
   return pid;
 }
 
@@ -380,6 +385,8 @@ exit(int status)
 
   release(&wait_lock);
 
+  printf("%d exit(): exiting process PID %d\n", ticks, p->pid);
+
   // Jump into the scheduler, never to return.
   sched();
   panic("zombie exit");
@@ -393,6 +400,8 @@ wait(uint64 addr)
   struct proc *pp;
   int havekids, pid;
   struct proc *p = myproc();
+
+  printf("%d wait(): process PID %d called wait()\n", ticks, p->pid);
 
   acquire(&wait_lock);
 
@@ -414,6 +423,7 @@ wait(uint64 addr)
             release(&wait_lock);
             return -1;
           }
+          printf("%d wait(): process PID %d completed waiting for child process PID %d to exit (which exited with exit code %d)\n", ticks, p->pid, pp->pid, pp->xstate);
           freeproc(pp);
           release(&pp->lock);
           release(&wait_lock);
@@ -432,6 +442,7 @@ wait(uint64 addr)
     // Wait for a child to exit.
     sleep(p, &wait_lock);  //DOC: wait-sleep
   }
+  printf("%d wait(): process PID %d is leaving wait()\n", ticks, p->pid);
 }
 
 // Per-CPU process scheduler.
@@ -692,4 +703,67 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+void
+set_enable_tracing(int en)
+{
+  if (en_strace == en) {
+    return;
+  } else {
+    en_strace = en;
+
+    struct proc* p;
+    for (p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      p->strace = en;
+      release(&p->lock);
+    }
+  }
+}
+
+extern struct {
+    struct spinlock lock;
+    struct proc proc[NPROC];  // Array von Prozessen
+} ptable;  // Deklaration
+
+
+
+int count_open_files(struct proc *p) {
+    int count = 0;
+    for (int i = 0; i < NOFILE; i++) {
+        if (p->ofile[i] != 0) {
+            count++;
+        }
+    }
+    return count;
+}
+
+
+int psinfo(struct proc_info *info) {
+    struct proc *p;
+    int i = 0;
+
+    char *states[] = {
+    [UNUSED]    "UNUSED",
+    [SLEEPING]  "SLEEPING",
+    [RUNNABLE]  "RUNNABLE",
+    [RUNNING]   "RUNNING",
+    [ZOMBIE]    "ZOMBIE"
+    };
+
+
+    acquire(&ptable.lock);
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if (p->state == UNUSED) continue;
+        
+        safestrcpy(info[i].name, p->name, sizeof(info[i].name));
+        info[i].pid = p->pid;
+        safestrcpy(info[i].state, states[p->state], sizeof(info[i].state));
+        info[i].open_files = count_open_files(p); // Implement as helper function.
+        info[i].memory = p->sz;
+        i++;
+    }
+    release(&ptable.lock);
+    return i; // Number of processes filled.
 }

@@ -128,6 +128,8 @@ exec(char *path, char **argv)
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
 
+  printf("%d exec(): process PID %d is executing %s\n", ticks, p->pid, path);
+
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
